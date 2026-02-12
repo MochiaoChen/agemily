@@ -80,12 +80,14 @@ class LlmConfig {
   final String apiKey;
   final LlmModel model;
   final String? systemPrompt;
+  final bool searchEnabled;
 
   const LlmConfig({
     this.baseUrl = 'https://api.anthropic.com',
     required this.apiKey,
     required this.model,
     this.systemPrompt,
+    this.searchEnabled = true,
   });
 
   LlmConfig copyWith({
@@ -93,12 +95,14 @@ class LlmConfig {
     String? apiKey,
     LlmModel? model,
     String? systemPrompt,
+    bool? searchEnabled,
   }) {
     return LlmConfig(
       baseUrl: baseUrl ?? this.baseUrl,
       apiKey: apiKey ?? this.apiKey,
       model: model ?? this.model,
       systemPrompt: systemPrompt ?? this.systemPrompt,
+      searchEnabled: searchEnabled ?? this.searchEnabled,
     );
   }
 }

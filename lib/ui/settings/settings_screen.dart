@@ -11,6 +11,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final hasKey = ref.watch(hasApiKeyProvider);
     final model = ref.watch(selectedModelProvider);
+    final searchEnabled = ref.watch(searchEnabledProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
@@ -32,6 +33,14 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => context.push('/settings/api'),
           ),
           _SectionHeader(title: '对话'),
+          SwitchListTile(
+            secondary: const Icon(Icons.travel_explore),
+            title: const Text('联网搜索'),
+            subtitle: const Text('允许助手搜索网络获取最新信息'),
+            value: searchEnabled,
+            onChanged: (_) =>
+                ref.read(searchEnabledProvider.notifier).toggle(),
+          ),
           ListTile(
             leading: const Icon(Icons.edit_note),
             title: const Text('系统提示词'),

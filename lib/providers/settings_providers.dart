@@ -147,6 +147,37 @@ class SystemPromptNotifier extends StateNotifier<String> {
   }
 }
 
+final searchEnabledProvider =
+    StateNotifierProvider<SearchEnabledNotifier, bool>((ref) {
+  return SearchEnabledNotifier(ref.watch(databaseProvider));
+});
+
+class SearchEnabledNotifier extends StateNotifier<bool> {
+  final dynamic _db;
+  static const _prefKey = 'search_enabled';
+
+  SearchEnabledNotifier(this._db) : super(true) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    final value = await _db.preferencesDao.getValue(_prefKey);
+    if (value != null) {
+      state = value == 'true';
+    }
+  }
+
+  Future<void> toggle() async {
+    state = !state;
+    await _db.preferencesDao.setValue(_prefKey, state.toString());
+  }
+
+  Future<void> setEnabled(bool enabled) async {
+    state = enabled;
+    await _db.preferencesDao.setValue(_prefKey, state.toString());
+  }
+}
+
 final llmConfigProvider = Provider<LlmConfig?>((ref) {
   final apiKey = ref.watch(apiKeyProvider);
   if (apiKey == null || apiKey.isEmpty) return null;
@@ -154,12 +185,14 @@ final llmConfigProvider = Provider<LlmConfig?>((ref) {
   final baseUrl = ref.watch(baseUrlProvider);
   final model = ref.watch(selectedModelProvider);
   final systemPrompt = ref.watch(systemPromptProvider);
+  final searchEnabled = ref.watch(searchEnabledProvider);
 
   return LlmConfig(
     baseUrl: baseUrl,
     apiKey: apiKey,
     model: model,
     systemPrompt: systemPrompt,
+    searchEnabled: searchEnabled,
   );
 });
 

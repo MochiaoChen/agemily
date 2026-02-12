@@ -97,6 +97,16 @@ class AnthropicClient implements LlmClient {
       body['system'] = systemPrompt;
     }
 
+    if (config.searchEnabled) {
+      body['tools'] = [
+        {
+          'type': 'web_search_20250305',
+          'name': 'web_search',
+          'max_uses': 5,
+        },
+      ];
+    }
+
     return body;
   }
 
@@ -215,6 +225,8 @@ class AnthropicClient implements LlmClient {
                   break;
 
                 case 'content_block_start':
+                  // Handle web_search_tool_result blocks — silently consume
+                  // so they don't interfere with normal text streaming.
                   break;
 
                 case 'content_block_delta':
@@ -232,6 +244,7 @@ class AnthropicClient implements LlmClient {
                         controller.add(LlmThinkingDelta(thinking));
                       }
                     }
+                    // input_json_delta (web search query) — silently skip
                   }
                   break;
 
