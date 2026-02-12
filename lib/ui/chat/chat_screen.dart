@@ -306,6 +306,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final isStreaming = ref.watch(isStreamingProvider);
     final streamingText = ref.watch(streamingTextProvider);
     final streamingThinking = ref.watch(streamingThinkingProvider);
+    final isSearching = ref.watch(isSearchingProvider);
+    final searchQuery = ref.watch(searchQueryProvider);
     final error = ref.watch(chatErrorProvider);
     final hasKey = ref.watch(hasApiKeyProvider);
     final activeModel = ref.watch(activeModelProvider);
@@ -324,6 +326,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           metadata: {
             'type': 'loading',
             'thinking': streamingThinking.isNotEmpty,
+            'searching': isSearching,
+            'searchQuery': searchQuery,
           },
         ));
       } else {
@@ -413,6 +417,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             ref.read(currentSessionIdProvider.notifier).state = null;
             ref.read(streamingTextProvider.notifier).state = '';
             ref.read(streamingThinkingProvider.notifier).state = '';
+            ref.read(isSearchingProvider.notifier).state = false;
+            ref.read(searchQueryProvider.notifier).state = '';
             ref.read(chatErrorProvider.notifier).state = null;
             _pendingRetry = null;
             _clearCaches();
@@ -502,7 +508,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     }
                     if (type == 'loading') {
                       final isThinking = meta['thinking'] == true;
-                      return _LoadingIndicator(isThinking: isThinking);
+                      final isSearching = meta['searching'] == true;
+                      final searchQuery = meta['searchQuery'] as String? ?? '';
+                      return _LoadingIndicator(
+                        isThinking: isThinking,
+                        isSearching: isSearching,
+                        searchQuery: searchQuery,
+                      );
                     }
                     return const SizedBox.shrink();
                   },
@@ -553,15 +565,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     );
 
                     if (isStreaming) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: MarkdownBody(
-                          data: msg.text,
-                          styleSheet: mdStyle,
-                          selectable: false,
-                          shrinkWrap: true,
-                          onTapLink: _onTapLink,
-                        ),
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: MarkdownBody(
+                              data: msg.text,
+                              styleSheet: mdStyle,
+                              selectable: false,
+                              shrinkWrap: true,
+                              onTapLink: _onTapLink,
+                            ),
+                          ),
+                          if (isSearching)
+                            _LoadingIndicator(
+                              isSearching: true,
+                              searchQuery: searchQuery,
+                            ),
+                        ],
                       );
                     }
 
@@ -1160,7 +1183,13 @@ class _ChatInputBarState extends State<_ChatInputBar> {
 /// Animated loading indicator for streaming messages.
 class _LoadingIndicator extends StatefulWidget {
   final bool isThinking;
-  const _LoadingIndicator({this.isThinking = false});
+  final bool isSearching;
+  final String searchQuery;
+  const _LoadingIndicator({
+    this.isThinking = false,
+    this.isSearching = false,
+    this.searchQuery = '',
+  });
 
   @override
   State<_LoadingIndicator> createState() => _LoadingIndicatorState();
@@ -1188,23 +1217,37 @@ class _LoadingIndicatorState extends State<_LoadingIndicator>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+
+    // Determine which status label to show (searching takes priority).
+    IconData? statusIcon;
+    String? statusLabel;
+    if (widget.isSearching) {
+      statusIcon = Icons.travel_explore;
+      statusLabel = widget.searchQuery.isNotEmpty
+          ? '搜索「${_truncateQuery(widget.searchQuery)}」'
+          : '搜索中';
+    } else if (widget.isThinking) {
+      statusIcon = Icons.lightbulb_outline;
+      statusLabel = '思考中';
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (widget.isThinking) ...[
-            Icon(
-              Icons.lightbulb_outline,
-              size: 14,
-              color: colorScheme.onSurfaceVariant,
-            ),
+          if (statusIcon != null) ...[
+            Icon(statusIcon, size: 14, color: colorScheme.onSurfaceVariant),
             const SizedBox(width: 6),
-            Text(
-              '思考中',
-              style: TextStyle(
-                fontSize: 13,
-                color: colorScheme.onSurfaceVariant,
+            Flexible(
+              child: Text(
+                statusLabel!,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ),
             const SizedBox(width: 6),
@@ -1233,6 +1276,9 @@ class _LoadingIndicatorState extends State<_LoadingIndicator>
       ),
     );
   }
+
+  static String _truncateQuery(String q) =>
+      q.length > 20 ? '${q.substring(0, 18)}…' : q;
 }
 
 /// Singleton helper wrapping flutter_tts plugin.

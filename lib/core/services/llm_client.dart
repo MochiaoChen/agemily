@@ -14,6 +14,13 @@ class LlmThinkingDelta extends LlmEvent {
   LlmThinkingDelta(this.thinking);
 }
 
+class LlmSearching extends LlmEvent {
+  final String query;
+  LlmSearching(this.query);
+}
+
+class LlmSearchComplete extends LlmEvent {}
+
 class LlmMessageStart extends LlmEvent {
   final TokenUsage usage;
   LlmMessageStart(this.usage);

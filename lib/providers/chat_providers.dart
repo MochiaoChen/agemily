@@ -24,6 +24,12 @@ final streamingTextProvider = StateProvider<String>((ref) => '');
 
 final streamingThinkingProvider = StateProvider<String>((ref) => '');
 
+/// Whether the LLM is currently executing a web search.
+final isSearchingProvider = StateProvider<bool>((ref) => false);
+
+/// The search query the LLM decided to use (empty until known).
+final searchQueryProvider = StateProvider<String>((ref) => '');
+
 final chatErrorProvider = StateProvider<String?>((ref) => null);
 
 final sendMessageProvider = Provider((ref) {
@@ -48,6 +54,8 @@ class SendMessageAction {
     _ref.read(isStreamingProvider.notifier).state = true;
     _ref.read(streamingTextProvider.notifier).state = '';
     _ref.read(streamingThinkingProvider.notifier).state = '';
+    _ref.read(isSearchingProvider.notifier).state = false;
+    _ref.read(searchQueryProvider.notifier).state = '';
     _ref.read(chatErrorProvider.notifier).state = null;
 
     final runner = _ref.read(agentRunnerProvider);
@@ -72,6 +80,15 @@ class SendMessageAction {
           case AgentThinkingDelta(:final thinking):
             _ref.read(streamingThinkingProvider.notifier).state += thinking;
 
+          case AgentSearching(:final query):
+            _ref.read(isSearchingProvider.notifier).state = true;
+            if (query.isNotEmpty) {
+              _ref.read(searchQueryProvider.notifier).state = query;
+            }
+
+          case AgentSearchComplete():
+            _ref.read(isSearchingProvider.notifier).state = false;
+
           case AgentComplete():
             break;
 
@@ -83,6 +100,7 @@ class SendMessageAction {
       _ref.read(chatErrorProvider.notifier).state = '发送失败，请重试';
     } finally {
       _ref.read(isStreamingProvider.notifier).state = false;
+      _ref.read(isSearchingProvider.notifier).state = false;
     }
   }
 }
