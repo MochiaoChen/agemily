@@ -97,6 +97,16 @@ class AnthropicClient implements LlmClient {
       body['system'] = systemPrompt;
     }
 
+    if (config.searchEnabled) {
+      body['tools'] = [
+        {
+          'type': 'web_search_20250305',
+          'name': 'web_search',
+          'max_uses': 5,
+        },
+      ];
+    }
+
     return body;
   }
 
@@ -184,6 +194,10 @@ class AnthropicClient implements LlmClient {
     var usage = const TokenUsage();
     var buffer = '';
 
+    // Track current content block for web search handling.
+    String? currentBlockType;
+    var searchQueryBuf = StringBuffer();
+
     final stringStream = utf8.decoder.bind(byteStream);
     final sub = stringStream.listen(
       (chunk) {
@@ -215,6 +229,17 @@ class AnthropicClient implements LlmClient {
                   break;
 
                 case 'content_block_start':
+                  final block = event['content_block'] as Map<String, dynamic>?;
+                  currentBlockType = block?['type'] as String?;
+                  if (currentBlockType == 'server_tool_use' &&
+                      block?['name'] == 'web_search') {
+                    // Search about to start — emit with empty query for now;
+                    // the actual query arrives via input_json_delta.
+                    searchQueryBuf = StringBuffer();
+                    controller.add(LlmSearching(''));
+                  } else if (currentBlockType == 'web_search_tool_result') {
+                    controller.add(LlmSearchComplete());
+                  }
                   break;
 
                 case 'content_block_delta':
@@ -231,11 +256,31 @@ class AnthropicClient implements LlmClient {
                       if (thinking.isNotEmpty) {
                         controller.add(LlmThinkingDelta(thinking));
                       }
+                    } else if (deltaType == 'input_json_delta' &&
+                        currentBlockType == 'server_tool_use') {
+                      // Accumulate the search query JSON fragment.
+                      final partial = delta['partial_json'] as String? ?? '';
+                      searchQueryBuf.write(partial);
                     }
                   }
                   break;
 
                 case 'content_block_stop':
+                  // When the server_tool_use block ends, emit the full query.
+                  if (currentBlockType == 'server_tool_use' &&
+                      searchQueryBuf.isNotEmpty) {
+                    try {
+                      final qJson = jsonDecode(searchQueryBuf.toString())
+                          as Map<String, dynamic>;
+                      final query = qJson['query'] as String? ?? '';
+                      if (query.isNotEmpty) {
+                        controller.add(LlmSearching(query));
+                      }
+                    } catch (_) {
+                      // Non-JSON or malformed — ignore.
+                    }
+                  }
+                  currentBlockType = null;
                   break;
 
                 case 'message_delta':

@@ -30,6 +30,13 @@ class AgentComplete extends AgentEvent {
   AgentComplete(this.message);
 }
 
+class AgentSearching extends AgentEvent {
+  final String query;
+  AgentSearching(this.query);
+}
+
+class AgentSearchComplete extends AgentEvent {}
+
 class AgentError extends AgentEvent {
   final String message;
   AgentError(this.message);
@@ -158,6 +165,12 @@ class AgentRunner {
         case LlmThinkingDelta(:final thinking):
           thinkingBuffer.write(thinking);
           yield AgentThinkingDelta(thinking);
+
+        case LlmSearching(:final query):
+          yield AgentSearching(query);
+
+        case LlmSearchComplete():
+          yield AgentSearchComplete();
 
         case LlmMessageStart():
           break;
